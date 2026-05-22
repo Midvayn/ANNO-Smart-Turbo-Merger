@@ -6,7 +6,8 @@ It is designed for AI model creators who want a simple local interface for weigh
 
 ## Screenshots
 
-![ANNO-Smart-Turbo-Manager UI](screenshots/Screenshot1.jpeg)
+![ANNO-Smart-Turbo-Manager UI](screenshots/screenshot1.jpeg)
+
 ## Features
 
 - Merge `.safetensors` LoRA files
