@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>ANNO Smart Turbo Merger</title>
+    <style>
+        body {
+            background: #0f0f0f;
+            color: #e0e0e0;
+            font-family: "Segoe UI", sans-serif;
+            display: flex;
+            justify-content: center;
+            padding: 40px;
+            margin: 0;
+        }
+
+        .panel {
+            background: #1a1a1a;
+            padding: 25px;
+            border-radius: 12px;
+            width: 480px;
+            border: 1px solid #333;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        h2 {
+            color: #4caf50;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-top: 0;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            font-size: 13px;
+            color: #aaa;
+            line-height: 1.4;
+            margin-bottom: 18px;
+        }
+
+        select, input, button {
+            width: 100%;
+            margin: 8px 0;
+            padding: 12px;
+            border-radius: 6px;
+            border: 1px solid #333;
+            background: #252525;
+            color: #fff;
+            box-sizing: border-box;
+        }
+
+        .label {
+            font-size: 12px;
+            color: #888;
+            margin-top: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        button {
+            background: #2e7d32;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s;
+            margin-top: 20px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        button:hover {
+            background: #4caf50;
+            transform: translateY(-2px);
+        }
+
+        button:disabled {
+            background: #333;
+            color: #777;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .row {
+            display: flex;
+            gap: 10px;
+        }
+
+        .status {
+            margin-top: 15px;
+            font-size: 13px;
+            line-height: 1.5;
+            color: #4caf50;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .hint {
+            font-size: 12px;
+            color: #777;
+            line-height: 1.4;
+            margin-top: 15px;
+            border-top: 1px solid #333;
+            padding-top: 14px;
+        }
+
+        .error {
+            color: #ff6b6b;
+        }
+    </style>
+</head>
+<body>
+    <div class="panel">
+        <h2>ANNO Smart Turbo Merger</h2>
+        <div class="subtitle">
+            Local Safetensors merger for LoRA and checkpoint experiments. File A is the base, File B is the donor.
+        </div>
+
+        <div class="label">Model type</div>
+        <select id="type" onchange="loadFiles()">
+            <option value="loras">LoRA</option>
+            <option value="checkpoints">Checkpoints</option>
+        </select>
+
+        <div class="label">File A / Base</div>
+        <select id="file_a"></select>
+
+        <div class="label">File B / Donor</div>
+        <select id="file_b"></select>
+
+        <div class="row">
+            <div style="flex:1">
+                <div class="label">Merge mode</div>
+                <select id="method">
+                    <option value="weighted_sum">Weighted Sum</option>
+                </select>
+            </div>
+            <div style="flex:1">
+                <div class="label">Output dtype</div>
+                <select id="precision">
+                    <option value="preserve">Preserve File A</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="label">Alpha / Donor strength: <span id="av">0.50</span></div>
+        <input
+            type="range"
+            id="alpha"
+            min="0"
+            max="1"
+            step="0.01"
+            value="0.5"
+            oninput="document.getElementById('av').innerText=Number(this.value).toFixed(2)"
+        >
+
+        <div class="label">Output filename</div>
+        <input type="text" id="output" placeholder="Example: my_merged_model">
+
+        <button id="mbtn" onclick="startMerge()">Start merge</button>
+
+        <div id="status" class="status"></div>
+
+        <div class="hint">
+            Put LoRA files into <b>models/loras</b> and checkpoint files into <b>models/checkpoints</b>.
+            The output is saved into the same selected folder.
+        </div>
+    </div>
+
+    <script>
+        async function loadFiles() {
+            const type = document.getElementById("type").value;
+            const status = document.getElementById("status");
+
+            try {
+                const res = await fetch(`/list?type=${type}`);
+                const data = await res.json();
+                const options = data.map(file => `<option value="${file}">${file}</option>`).join("");
+
+                document.getElementById("file_a").innerHTML = options;
+                document.getElementById("file_b").innerHTML = options;
+
+                if (!data.length) {
+                    status.classList.remove("error");
+                    status.innerText = `No .safetensors files found in models/${type}.`;
+                } else {
+                    status.innerText = "";
+                }
+            } catch (error) {
+                status.classList.add("error");
+                status.innerText = `File list error: ${error}`;
+            }
+        }
+
+        async function startMerge() {
+            const btn = document.getElementById("mbtn");
+            const status = document.getElementById("status");
+
+            btn.disabled = true;
+            btn.innerText = "Merging...";
+            status.classList.remove("error");
+            status.innerText = "Working. Large checkpoint files can take a while.";
+
+            const payload = {
+                type: document.getElementById("type").value,
+                file_a: document.getElementById("file_a").value,
+                file_b: document.getElementById("file_b").value,
+                alpha: document.getElementById("alpha").value,
+                method: document.getElementById("method").value,
+                precision: document.getElementById("precision").value,
+                output: document.getElementById("output").value
+            };
+
+            try {
+                const res = await fetch("/merge", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await res.json();
+
+                if (result.error) {
+                    status.classList.add("error");
+                    status.innerText = result.error;
+                } else {
+                    status.classList.remove("error");
+                    status.innerText = result.status;
+                    await loadFiles();
+                }
+            } catch (error) {
+                status.classList.add("error");
+                status.innerText = `Merge error: ${error}`;
+            }
+
+            btn.disabled = false;
+            btn.innerText = "Start merge";
+        }
+
+        loadFiles();
+    </script>
+</body>
+</html>
