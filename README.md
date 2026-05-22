@@ -4,6 +4,9 @@ ANNO Smart Turbo Merger is a small local web tool for merging `.safetensors` LoR
 
 It is designed for AI model creators who want a simple local interface for weighted-sum merging without uploading models to any external service.
 
+## Screenshots
+
+![ANNO-Smart-Turbo-Manager UI](screenshots/Screenshot1.jpeg)
 ## Features
 
 - Merge `.safetensors` LoRA files
